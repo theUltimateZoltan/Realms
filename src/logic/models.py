@@ -1,9 +1,11 @@
 from __future__ import annotations
-from typing import Callable, List, Union
+from random import Random
+from typing import Callable, Dict, List, Union
 import boto3
 import yaml
 import logging
 import json
+from itertools import chain, cycle
 
 logger = logging.getLogger()
 db_client = boto3.client('dynamodb')
@@ -32,6 +34,7 @@ class Player:
     @staticmethod
     def noob() -> dict:
         return {
+            "type": {"S": "player"},
             "place": {"S": "noobville"},
             "att": {"N": "1"},
             "def": {"N": "0"},
@@ -87,13 +90,17 @@ class Player:
             Key={"connection_id": {"S": self.connection_id}}
         )
 
-    def talk(self, content: str) -> None:
-        players_nearby = db_client.scan(
+    @staticmethod
+    def get_all_players_details_in_place(place: str) -> List[dict]:
+        return db_client.scan(
             TableName='realms_state',
             ConsistentRead=True,
             FilterExpression="place = :player_location",
-            ExpressionAttributeValues= { ':player_location': {"S": self.location()} }
+            ExpressionAttributeValues= { ':player_location': {"S": place} }
         ).get("Items")
+
+    def talk(self, content: str) -> None:
+        players_nearby = Player.get_all_players_details_in_place(self.location())
         for player in players_nearby:
             player_conn_id = player.get("connection_id")["S"]
             logger.info(f"{ player_conn_id } attempts hearing { self.connection_id }")
@@ -109,8 +116,73 @@ class Player:
                 ":val": {"S": location}
             }
         )
+        # TODO deaggrevate enemies in previous location if aggro was on player
         logger.info(f"{ self.connection_id } has traveled to { location }")
 
+
+class Encounter:
+    def __init__(self, place: str, type: str) -> None:
+        self.__place = place
+        self.__type = type
+        self.__enemies_details: dict = Realm.get_instance().get_encounter_details(self.__type).get("enemies")
+
+    def get_enemy_instances(self) -> List[EnemyInstance]:
+        return [ EnemyInstance(self, enemy, self.__place, i) for enemy, i in chain(
+            zip(cycle(enemy) ,range(self.__enemies_details.get(enemy))) for enemy in self.__enemies_details) ]
+
+    def spawn_timer_tick(self) -> None:
+        for enemy in self.get_enemy_instances():
+            enemy.spawn_timer_tick()
+
+    def aggrevate_enemies(self) -> None:
+        for enemy in self.get_enemy_instances():
+            enemy.natural_aggrevation()
+
+class EnemyInstance:
+    enemy_instances_table: str = "realms_enemies"
+
+    def __init__(self, encounter: Encounter, type: str, place: str, index: int) -> None:
+        self.__identifier = f"{place}_{encounter}_{type}_{index}"
+        self.__type = type
+        self.__place = place
+
+    def spawn_timer_tick(self) -> None:
+        enemy_db_object = db_client.get_item(
+                TableName=EnemyInstance.enemy_instances_table,
+                Key={"enemy_instance": {"S": self.__identifier}}
+            )
+        if enemy_db_object:
+            db_client.update_item(
+                TableName=EnemyInstance.enemy_instances_table,
+                Key={"enemy_instance": {"S": self.__identifier}},
+                UpdateExpression="SET spawn_cooldown = spawn_cooldown - 1",
+                ConditionExpression="spawn_cooldown > 0"
+            )
+        else:
+            db_client.put_item(
+                TableName=EnemyInstance.enemy_instances_table, 
+                Item={"enemy_instance": {"S": self.__identifier},
+                    "type": {"S": self.__type }, 
+                    "place": {"S": self.__place },
+                    "spawn_cooldown": {"N": "0"}
+                }
+            )
+
+    def natural_aggrevation(self) -> None:
+        if Realm.get_instance().get_enemy_details(self.__type).get("agressive"):
+            nearby_players: List[dict] = Player.get_all_players_details_in_place(self.__place)
+            victim_details: dict = Random().choice(nearby_players)  # This choice should consider way more variables (damage taken from each player, level, etc) but its fine for now
+            self.aggro(Player(victim_details.get("connection_id")["S"]))
+
+    def aggro(self, player: Player) -> None:
+        db_client.update_item(
+            TableName=EnemyInstance.enemy_instances_table,
+            Key={"type": {"S": self.__type}, "place": {"S": self.__place}},
+            UpdateExpression="SET aggro = :val",
+            ExpressionAttributeValues={
+                ":val": {"S": player.connection_id}
+            }
+        )
 
 class Realm:
     __instance: Union[Realm, None] = None
@@ -141,15 +213,27 @@ class Realm:
         npcs_names_in_loc = self.get_place_description(location).get("npc")
         return {npc: details for npc, details in self.__npc.items() if npc in npcs_names_in_loc}
 
-    def get_npc_details(self, npc_name) -> dict:
+    def get_npc_details(self, npc_name: str) -> dict:
         return self.__npc.get(npc_name)
     
-    def get_item_details(self, item_name) -> dict:
+    def get_item_details(self, item_name: str) -> dict:
         return self.__items.get(item_name)
+    
+    def get_enemy_details(self, enemy_type: str) -> dict:
+        return self.__enemies.get(enemy_type)
     
     def get_available_travel_locations(self, current_location) -> List[str]:
         return self.__places[current_location].get("travel")
-
+    
+    def get_encounters(self) -> List[Encounter]:
+        encounters = list()
+        for place in self.__places:
+            encounters_in_place = place.get("encounter") if "encounter" in place.keys() else []
+            encounters.extend([Encounter(place, enc) for enc in encounters_in_place])
+        return encounters
+    
+    def get_encounter_details(self, encounter_name) -> dict:
+        return self.__encounters[encounter_name]
 
     @staticmethod
     def __load_realm_files_from_repo(realm_name: str) -> dict:
@@ -200,7 +284,7 @@ class NpcOptionEffectFactory:
                 item: amount
             })
             websocket_api_manager.post_to_connection(ConnectionId=self.__player.connection_id ,
-                                                     Data="SYS#successfully purchased.")
+                                                     Data={"SYS": "successfully purchased."})
         else:
             websocket_api_manager.post_to_connection(ConnectionId=self.__player.connection_id ,
-                                                     Data="SYS#insufficient funds.")
+                                                     Data={"SYS":"insufficient funds."})

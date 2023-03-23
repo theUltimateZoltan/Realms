@@ -1,4 +1,5 @@
-src/infra/builds/*
-src/infra/realms/*
+src/infra/builds
+src/infra/realms
 src/.terraform
+src/infra/.terraform
 src/builds/terraform

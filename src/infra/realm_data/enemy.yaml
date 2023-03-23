@@ -6,3 +6,5 @@ wolf:
   def: 0
   dex: 0
   acc: 1
+  spawn_rate: 3  # rates are in minutes
+  agressive: true  # will attack a player unprovoked

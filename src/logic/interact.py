@@ -98,5 +98,8 @@ class InteractionRequest:
                 action_builder.then(
                     log(f"{self.__requesting_player.connection_id} attempts to perform {option} on {target} with parameters {parameters}")).then(
                     NpcOptionEffectFactory(nearby_npc.get(target), self.__requesting_player).get_effect(option, parameters))
+        elif self.__base_action == "hit":
+            target = self.parameter(0)
+            # if there is a living target in the room, hit it
 
         return action_builder

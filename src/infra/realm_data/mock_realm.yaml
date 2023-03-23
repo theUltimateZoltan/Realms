@@ -15,4 +15,5 @@ mock_realm:
       description: a dark cave, with blood trailing out of it
       travel:
         - noobville
-      encounter: pack_of_wolves
+      encounter: 
+        - pack_of_wolves
