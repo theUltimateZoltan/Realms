@@ -1,0 +1,28 @@
+iron_sword:
+  value: 100
+  type: weapon
+  subtypes:
+    - sword
+    - melee
+  damage: 2
+
+wooden_shield:
+  value: 150
+  type: secondary
+  subtypes:
+    - shield
+
+small_health_potion:
+  value: 65
+  type: consumable
+  subtypes:
+    - health
+    - potion
+  effects:
+    heal: 2
+
+gold:
+  value: 1
+  type: currency
+  subtypes:
+    - weightless

@@ -1,0 +1,8 @@
+wolf:
+  description: "a starving wild wolf. It does not look friendly."
+  maxhp: 3
+  hp: 3
+  att: 1
+  def: 0
+  dex: 0
+  acc: 1

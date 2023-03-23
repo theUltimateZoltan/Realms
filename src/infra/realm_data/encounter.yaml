@@ -1,0 +1,6 @@
+pack_of_wolves:
+  description: A pack of stray wolves are slowly surrounding you, gnarling and drooling.
+  enemies:
+    wolf: 4
+  loot:
+    gold: 150

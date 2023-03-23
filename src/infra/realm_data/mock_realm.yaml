@@ -1,0 +1,18 @@
+mock_realm:
+  places:
+    noobville:
+      type: town
+      description: some initial town
+      travel:
+        - wolves_den
+      npc: 
+        - blacksmith
+        - witch
+        - sherrif
+
+    wolves_den:
+      type: landmark
+      description: a dark cave, with blood trailing out of it
+      travel:
+        - noobville
+      encounter: pack_of_wolves

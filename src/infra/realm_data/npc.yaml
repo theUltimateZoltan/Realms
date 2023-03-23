@@ -1,0 +1,18 @@
+sherrif:
+  description: an honorable sherrif, with a sherrif's badge.
+  talk:
+    - who are you?: 
+        response: I'm the town's sherrif. I have quests!
+        options:
+          - cool! give me a quest.:
+            response: You got me, I don't have any yet.
+          - goodbye.
+
+witch:
+  description: an old crone, stirring a dubious concoction.
+
+blacksmith:
+  description: a sturdy blacksmith, weilding a mighty hammer.
+  shop:
+    iron_sword: 100
+    wooden_shield: 150
