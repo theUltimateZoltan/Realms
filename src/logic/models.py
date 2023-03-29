@@ -116,7 +116,6 @@ class Player:
                 ":val": {"S": location}
             }
         )
-        # TODO deaggrevate enemies in previous location if aggro was on player
         logger.info(f"{ self.connection_id } has traveled to { location }")
 
 
@@ -137,6 +136,13 @@ class Encounter:
     def aggrevate_enemies(self) -> None:
         for enemy in self.get_enemy_instances():
             enemy.natural_aggrevation()
+
+    def get_location(self) -> str:
+        return self.__place
+    
+    @staticmethod
+    def get_encounters_in_place(place: str) -> List[Encounter]:
+        return [enc for enc in Realm.get_instance().get_encounters() if enc.get_location() == place]
 
 class EnemyInstance:
     enemy_instances_table: str = "realms_enemies"
@@ -173,6 +179,13 @@ class EnemyInstance:
             nearby_players: List[dict] = Player.get_all_players_details_in_place(self.__place)
             victim_details: dict = Random().choice(nearby_players)  # This choice should consider way more variables (damage taken from each player, level, etc) but its fine for now
             self.aggro(Player(victim_details.get("connection_id")["S"]))
+
+    def deaggrevate(self) -> None:
+        db_client.update_item(
+            TableName=EnemyInstance.enemy_instances_table,
+            Key={"type": {"S": self.__type}, "place": {"S": self.__place}},
+            UpdateExpression="REMOVE aggro",
+        )
 
     def aggro(self, player: Player) -> None:
         db_client.update_item(
